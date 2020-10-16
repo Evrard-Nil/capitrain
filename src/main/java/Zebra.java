@@ -13,6 +13,7 @@ import java.util.HashMap;
 
 import org.chocosolver.examples.AbstractProblem;
 import org.chocosolver.solver.Model;
+import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.variables.IntVar;
 
@@ -76,11 +77,11 @@ public class Zebra extends AbstractProblem {
         IntVar milk   = attr[DRINK][3];
         IntVar oj     = attr[DRINK][4];
 
-        model.allDifferent(attr[COLOR], "AC").post();
-        model.allDifferent(attr[CIGARETTE], "AC").post();
-        model.allDifferent(attr[NATIONALITY], "AC").post();
-        model.allDifferent(attr[PET], "AC").post();
-        model.allDifferent(attr[DRINK], "AC").post();
+        model.allDifferent(attr[COLOR]).post();
+        model.allDifferent(attr[CIGARETTE]).post();
+        model.allDifferent(attr[NATIONALITY]).post();
+        model.allDifferent(attr[PET]).post();
+        model.allDifferent(attr[DRINK]).post();
 
         eng.eq(red).post(); // 2. the Englishman lives in the red house
         spain.eq(dog).post(); // 3. the Spaniard owns a dog
@@ -104,7 +105,9 @@ public class Zebra extends AbstractProblem {
 
     @Override
     public void solve() {
-        try {
+        
+    	System.out.println(model);
+    	try {
             model.getSolver().propagate();
             
             HashMap<Integer, ArrayList<IntVar>> casesEgales = new HashMap<Integer, ArrayList<IntVar>>();
@@ -125,33 +128,30 @@ public class Zebra extends AbstractProblem {
             for(int i =  0; i < attr.length ; i++) {
             	ArrayList<IntVar> varEgales = (ArrayList<IntVar>) casesEgales.get(i);
             	for(int j =  0; j < varEgales.size() ; j++) {
-            		for(int k =  j+1; k < varEgales.size() ; k++) {
-            			varEgales.get(j).eq(varEgales.get(k)).post();
-                	}
             		varEgales.get(j).eq(i).post();
             	}
             }
             model.getSolver().propagate();
             System.out.println(model);
+            print(attr);
             
         } catch (ContradictionException e) {
             e.printStackTrace();
         }
 
 //        while (model.getSolver().solve()) {
-//            int z = zebra.getValue();
-//            int n = -1;
-//            for (int i = 0; i < SIZE; i++) {
-//                if (z == attr[NATIONALITY][i].getValue()) {
-//                    n = i;
-//                }
-//            }
-//            if (n >= 0) {
-//                System.out.printf("%n%-13s%s%s%s%n", "",
-//                        "============> The Zebra is owned by the ", sAttr[NATIONALITY][n], " <============");
-//            }
-//            print(attr);
-//        }
+        int z = zebra.getValue();
+        int n = -1;
+        for (int i = 0; i < SIZE; i++) {
+            if (z == attr[NATIONALITY][i].getValue()) {
+                n = i;
+            }
+        }
+        if (n >= 0) {
+            System.out.printf("%n%-13s%s%s%s%n", "",
+                    "============> The Zebra is owned by the ", sAttr[NATIONALITY][n], " <============");
+        }
+        print(attr);
     }
     private void print(IntVar[][] pos) {
         System.out.printf("%-13s%-13s%-13s%-13s%-13s%-13s%n", "",
@@ -171,5 +171,28 @@ public class Zebra extends AbstractProblem {
 
     public static void main(String[] args) {
         new Zebra().execute(args);
+    }
+    
+    private void candidateExplanations() {
+    	try {
+    		
+    		IntVar[][] oldAttr = attr.clone();
+    		Constraint[] oldCons =  model.getCstrs().clone();
+    		
+    		model.getSolver().propagate();
+    		
+    		
+	    	for(int i =  0; i < attr.length ; i++) {
+	        	for(int j =  0 ; j < attr[i].length ; j++) {
+//	        		if (attr[i][j].()) {
+//	        			
+//	        		}
+	        	}
+	        }
+	    	
+	    	
+    	 } catch (ContradictionException e) {
+             e.printStackTrace();
+         }
     }
 }
