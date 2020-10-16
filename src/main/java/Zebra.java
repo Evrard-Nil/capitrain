@@ -8,6 +8,9 @@
  *
  * See LICENSE file in the project root for full license information.
  */
+import java.util.ArrayList;
+import java.util.HashMap;
+
 import org.chocosolver.examples.AbstractProblem;
 import org.chocosolver.solver.Model;
 import org.chocosolver.solver.exception.ContradictionException;
@@ -103,24 +106,52 @@ public class Zebra extends AbstractProblem {
     public void solve() {
         try {
             model.getSolver().propagate();
+            
+            HashMap<Integer, ArrayList<IntVar>> casesEgales = new HashMap<Integer, ArrayList<IntVar>>();
+
+            for(int i =  0; i < attr.length ; i++) {
+        		casesEgales.put(i, new ArrayList<IntVar>());
+            }
+            
+            for(int i =  0; i < attr.length ; i++) {
+            	for(int j =  0 ; j < attr[i].length ; j++) {
+//            		System.out.println(i+","+j+" : " + attr[i][j]);
+            		if (attr[i][j].isInstantiated()) {
+            			casesEgales.get(attr[i][j].getValue()).add(attr[i][j]);
+            		}
+            	}
+            }      
+            
+            for(int i =  0; i < attr.length ; i++) {
+            	ArrayList<IntVar> varEgales = (ArrayList<IntVar>) casesEgales.get(i);
+            	for(int j =  0; j < varEgales.size() ; j++) {
+            		for(int k =  j+1; k < varEgales.size() ; k++) {
+            			varEgales.get(j).eq(varEgales.get(k)).post();
+                	}
+            		varEgales.get(j).eq(i).post();
+            	}
+            }
+            model.getSolver().propagate();
+            System.out.println(model);
+            
         } catch (ContradictionException e) {
             e.printStackTrace();
         }
 
-        /*while (model.getSolver().solve()) */{
-            int z = zebra.getValue();
-            int n = -1;
-            for (int i = 0; i < SIZE; i++) {
-                if (z == attr[NATIONALITY][i].getValue()) {
-                    n = i;
-                }
-            }
-            if (n >= 0) {
-                System.out.printf("%n%-13s%s%s%s%n", "",
-                        "============> The Zebra is owned by the ", sAttr[NATIONALITY][n], " <============");
-            }
-            print(attr);
-        }
+//        while (model.getSolver().solve()) {
+//            int z = zebra.getValue();
+//            int n = -1;
+//            for (int i = 0; i < SIZE; i++) {
+//                if (z == attr[NATIONALITY][i].getValue()) {
+//                    n = i;
+//                }
+//            }
+//            if (n >= 0) {
+//                System.out.printf("%n%-13s%s%s%s%n", "",
+//                        "============> The Zebra is owned by the ", sAttr[NATIONALITY][n], " <============");
+//            }
+//            print(attr);
+//        }
     }
     private void print(IntVar[][] pos) {
         System.out.printf("%-13s%-13s%-13s%-13s%-13s%-13s%n", "",
