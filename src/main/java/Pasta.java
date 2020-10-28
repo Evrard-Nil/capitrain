@@ -16,34 +16,34 @@ import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.variables.IntVar;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.List;
 
 /**
- * Simple example which solve Zebra puzzle
- * <br/>
+ * Simple example which solve Zebra puzzle <br/>
  *
  * @author GK
  * @since 29/01/19
  */
 public class Pasta extends AbstractProblem {
 
-    private final String[] orders = {"4", "8", "12", "16"}; // 1. four orders of different prices
+    private final String[] orders = { "4", "8", "12", "16" }; // 1. four orders of different prices
     private final int SIZE = orders.length;
     private final int PASTA = 0, SAUCE = 1, PEOPLE = 2;
-    private final String[] sAttrTitle = {"Pasta", "Sauce", "People"};
-    private final String[][] sAttr = {
-            {"Rotini", "Tagliolini", "Farfalle", "Capellini"},
-            {"otherSauce", "Arrabiata", "Marinara", "Puttanesca"},
-            {"Angie", "Damon", "Claudia", "Elisa"}
-    };
+    private final String[] sAttrTitle = { "Pasta", "Sauce", "People" };
+    private final String[][] sAttr = { { "Rotini", "Tagliolini", "Farfalle", "Capellini" },
+            { "otherSauce", "Arrabiata", "Marinara", "Puttanesca" }, { "Angie", "Damon", "Claudia", "Elisa" } };
     private IntVar[][] attr;
+    private List<Constraint> constraints;
+    private List<String> clues;
+    protected Model model2;
 
     @Override
     public void buildModel() {
 
         model = new Model();
+        model2 = new Model();
 
-        attr = model.intVarMatrix("attr", SIZE-1, SIZE, 1, SIZE);
+        attr = model.intVarMatrix("attr", SIZE - 1, SIZE, 1, SIZE);
 
         IntVar rotini = attr[PASTA][0];
         IntVar tagli = attr[PASTA][1];
@@ -63,16 +63,41 @@ public class Pasta extends AbstractProblem {
         model.allDifferent(attr[PASTA]).post();
         model.allDifferent(attr[SAUCE]).post();
         model.allDifferent(attr[PEOPLE]).post();
+        model2.allDifferent(attr[PASTA]).post();
+        model2.allDifferent(attr[SAUCE]).post();
+        model2.allDifferent(attr[PEOPLE]).post();
 
-        cape.lt(arrabi).post();// 1. The person who ordered capellini paid less than the person who chose arrabiata sauce
-        angie.lt(tagli).post();// 2. The person who ordered tagliolini paid more than Angie
-        tagli.lt(marina).post();// 3. The person who ordered tagliolini paid less than the person who chose marinara sauce
-        claudia.ne(puttan).post();// 4. Claudia did not order puttanesca
-        rotini.dist(damon).eq(2);// 5. The person who ordered rotini is either the person who paid $8 more than Damon
-        // or the person who paid $8 less than Damon
-        cape.eq(damon).or(cape.eq(claudia)).post();// 6. The person who ordered capellini is either Damon or Claudia
-        arrabi.eq(angie).or(arrabi.eq(elisa)).post();// 7. The person who chose arrabiata sauce is either Angie or Elisa
-        arrabi.eq(farfa).post();// 8. The person who chose arrabiata sauce ordered farfalle
+        constraints = new ArrayList<>();
+        clues = new ArrayList<>();
+
+        clues.add("The person who ordered capellini paid less than the person who chose arrabiata sauce");
+        constraints.add(cape.lt(arrabi).decompose());
+
+        clues.add("The person who ordered tagliolini paid more than Angie");
+        constraints.add(angie.lt(tagli).decompose());
+
+        clues.add("The person who ordered tagliolini paid less than the person who chose marinara sauce");
+        constraints.add(tagli.lt(marina).decompose());
+
+        clues.add("Claudia did not order puttanesca");
+        constraints.add(claudia.ne(puttan).decompose());
+
+        clues.add("The person who ordered rotini is either the person who paid $8 more than Damon$"
+                + "or the person who paid $8 less than Damon");
+        constraints.add(rotini.dist(damon).eq(2).decompose());
+
+        clues.add("The person who ordered capellini is either Damon or Claudia");
+        constraints.add(cape.eq(damon).or(cape.eq(claudia)).decompose());
+
+        clues.add("The person who chose arrabiata sauce is either Angie or Elisa");
+        constraints.add(arrabi.eq(angie).or(arrabi.eq(elisa)).decompose());
+
+        clues.add("The person who chose arrabiata sauce ordered farfalle");
+        constraints.add(arrabi.eq(farfa).decompose());
+        for (Constraint c : constraints) {
+            model.post(c);
+            model2.post();
+        }
     }
 
     @Override
@@ -81,10 +106,9 @@ public class Pasta extends AbstractProblem {
 
     @Override
     public void solve() {
-
-        System.out.println(model);
         try {
             model.getSolver().propagate();
+            System.out.println(model);
         } catch (ContradictionException e) {
             e.printStackTrace();
         }
@@ -92,9 +116,8 @@ public class Pasta extends AbstractProblem {
     }
 
     private void print(IntVar[][] pos) {
-        System.out.printf("%-13s%-13s%-13s%-13s%-13s%n", "",
-                orders[0], orders[1], orders[2], orders[3]);
-        for (int i = 0; i < SIZE-1; i++) {
+        System.out.printf("%-13s%-13s%-13s%-13s%-13s%n", "", orders[0], orders[1], orders[2], orders[3]);
+        for (int i = 0; i < SIZE - 1; i++) {
             String[] sortedLine = new String[SIZE];
             for (int j = 0; j < SIZE; j++) {
                 sortedLine[pos[i][j].getValue() - 1] = sAttr[i][j];
