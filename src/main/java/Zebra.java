@@ -17,6 +17,7 @@ import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.Variable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
@@ -157,55 +158,8 @@ public class Zebra extends AbstractProblem {
 
     @Override
     public void solve() {
-
-//    	System.out.println(model);
-//    	try {
-//            model.getSolver().propagate();
-//            
-//            HashMap<Integer, ArrayList<IntVar>> casesEgales = new HashMap<Integer, ArrayList<IntVar>>();
-//
-//            for(int i =  0; i < SIZE ; i++) {
-//        		casesEgales.put(i, new ArrayList<IntVar>());
-//            }
-//            
-//            for(int i =  0; i < SIZE ; i++) {
-//            	for(int j =  0 ; j < SIZE ; j++) {
-////            		System.out.println(i+","+j+" : " + attr[i][j]);
-//            		if (attr[i][j].isInstantiated()) {
-//            			casesEgales.get(attr[i][j].getValue()).add(attr[i][j]);
-//            		}
-//            	}
-//            }      
-//            
-//            for(int i =  0; i < SIZE ; i++) {
-//            	ArrayList<IntVar> varEgales = (ArrayList<IntVar>) casesEgales.get(i);
-//            	for(int j =  0; j < varEgales.size() ; j++) {
-//            		varEgales.get(j).eq(i).post();
-//            	}
-//            }
-//            model.getSolver().propagate();
-//            System.out.println(model);
-//            print(attr);
-//            
-//        } catch (ContradictionException e) {
-//            e.printStackTrace();
-//        }
-//
-////        while (model.getSolver().solve()) {
-//        int z = zebra.getValue();
-//        int n = -1;
-//        for (int i = 0; i < SIZE; i++) {
-//            if (z == attr[NATIONALITY][i].getValue()) {
-//                n = i;
-//            }
-//        }
-//        if (n >= 0) {
-//            System.out.printf("%n%-13s%s%s%s%n", "",
-//                    "============> The Zebra is owned by the ", sAttr[NATIONALITY][n], " <============");
-//        }
-//        print(attr);
-
-        candidateExplanations();
+    	candidateExplanations();
+//    	test();
     }
 
     private void print(IntVar[][] pos) {
@@ -236,84 +190,126 @@ public class Zebra extends AbstractProblem {
 
             List<List<IntVar>> candidatesVariable = new ArrayList<>();
             List<ContradictionException> candidatesContradictions = new ArrayList<>();
+    		
+    		// Look for facts that need to be explained
+    		model.getSolver().propagate();
+    		// Corresponds to J \ I in algorithm 2
+    		List<IntVar> listDifferences = findDifferences(attr2, attr);
 
-            // Look for facts that need to be explained
-            model.getSolver().propagate();
-            // Corresponds to J \ I in algorithm 2
-            List<IntVar> listDifferences = findDifferences(attr2, attr);
+    		Variable[] modelVars = model2.getVars();
 
-            Variable[] modelVars = model2.getVars();
+    		List<Constraint> constraintsToUnpost = new ArrayList<>();
+    		
+    		int nIndex = 0;
+    		int nIndexPushed = 0;
+    		
+    		while (nIndex < listDifferences.size()) {
+    			
+    			IntVar n = listDifferences.get(nIndex);
+    			
+    			System.out.println(n);
+    			
+    			// Find the variable corresponding to the new fact
+    			int i = getVarATraiter(modelVars, n);
+    			
+    			if (model2.getSolver().getEnvironment().getWorldIndex() == 0) {
 
-            for (IntVar n : listDifferences) {
-                System.out.println(n);
-                IntVar currentVar = null;
-                Constraint vConstraint = null;
-
-                // Find the variable corresponding to the new fact
-                for (int i = 0; i < modelVars.length; i++) {
-                    if (n.getName().equals(modelVars[i].getName())) {
-                        currentVar = (IntVar) modelVars[i];
-                    }
-                }
-                // Save current state
-                model2.getSolver().getEnvironment().worldPush();
-
-                // Create a not_n constraints
-                if (!n.isInstantiated()) {
-                    int[] valuesArray = getValues(notN(n));
-                    vConstraint = currentVar.in(valuesArray).decompose();
-                } else {
-                    vConstraint = currentVar.ne(n.getValue()).decompose();
-                }
-                IntVar[][] attrStateSnapshot = deepCopy(attr2);
-                model2.post(vConstraint);
-                try {
-
-                    model2.getSolver().propagate();
-                } catch (ContradictionException e) {
-                    e.printStackTrace();
-                    candidatesContradictions.add(e);
-                    // Keep all implied facts
-                    candidatesVariable.add(findDifferences(attrStateSnapshot, attr2));
-                } finally {
-                    model2.getSolver().getEnvironment().worldPop();
-                    model2.unpost(vConstraint);
-                    model2.post(vConstraint.getOpposite());
-                }
-
-            }
-
-            print(attr2);
-
-        } catch (ContradictionException e) {
-            e.printStackTrace();
-        }
+    				Constraint vConstraint;
+    				
+    				// Save current state
+    				model2.getSolver().getEnvironment().worldPush();
+    				nIndexPushed = nIndex;
+    				
+    				// Create a not_n constraints
+					int[] valuesArray = getValues(notN(n));
+					vConstraint = ((IntVar) modelVars[i]).in(valuesArray).decompose();
+    				
+    				constraintsToUnpost.add(vConstraint);
+    				IntVar[][] attrStateSnapshot = deepCopy(attr2);
+    				
+    				model2.post(vConstraint);
+    				 try {
+	                    model2.getSolver().propagate();
+	                } catch (ContradictionException e) {
+	                    e.printStackTrace();
+	                    candidatesContradictions.add(e);
+	                    
+	                    // Keep all implied facts
+	                    candidatesVariable.add(findDifferences(attrStateSnapshot, attr2));
+	                    
+	                    model2.getSolver().getEnvironment().worldPop();
+	                    nIndex = nIndexPushed-1;
+	                    model2.unpost(vConstraint);
+	                    model2.post(vConstraint.getOpposite());
+	                }
+    			}
+    			else {
+    			
+    				Constraint vConstraint;
+    				
+    				// Create a n constraints
+					int[] valuesArray = getValues(n);
+					vConstraint = ((IntVar) modelVars[i]).in(valuesArray).decompose();
+    				
+    				constraintsToUnpost.add(vConstraint);
+    				model2.post(vConstraint);
+    				try {
+    					model2.getSolver().propagate();
+    				}
+    				catch (ContradictionException e) {
+    					e.printStackTrace();
+    					model2.getSolver().getEnvironment().worldPop();
+    					nIndex = nIndexPushed-1;
+    					model2.unpost(vConstraint);
+    					model2.post(vConstraint.getOpposite());
+    				}
+    			}
+    			nIndex++;
+    		}
+    		
+    		print(attr2);
+    		
+    	 } catch (ContradictionException e) {
+             e.printStackTrace();
+         }
     }
 
+	private int getVarATraiter(Variable[] modelVars, IntVar n) {
+		Variable variableATraiter = null;
+		int i = -1;
+		while (variableATraiter == null) {
+			i++;
+			if (n.getName().equals(modelVars[i].getName())) {
+				variableATraiter = modelVars[i];
+			}
+		}
+		return i;
+	}
+    
     private IntVar[][] deepCopy(IntVar[][] attr) {
-
-        IntVar[][] ret = new IntVar[SIZE][SIZE];
-        Model modelCopy = new Model();
-
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-
-                Iterator<Integer> valuesItr = attr[i][j].iterator();
-                ArrayList<Integer> valuesArrayList = new ArrayList<>();
-
-                while (valuesItr.hasNext()) {
-                    Integer v = valuesItr.next();
-                    valuesArrayList.add(v);
-                }
-
-                int[] valuesArray = valuesArrayList.stream().mapToInt(v -> v.intValue()).toArray();
-
-                ret[i][j] = modelCopy.intVar(attr[i][j].getName(), valuesArray);
-            }
-        }
-        return ret;
+    	
+    	IntVar[][] ret = new IntVar[SIZE][SIZE];
+    	Model modelCopy = new Model();
+    	
+    	for (int i = 0 ; i < SIZE ; i ++) {
+    		for (int j = 0 ; j < SIZE ; j++) {
+    			
+    			Iterator<Integer> valuesItr = attr[i][j].iterator();
+    			ArrayList<Integer> valuesArrayList = new ArrayList<>();
+    			
+    			while (valuesItr.hasNext()) {
+    				Integer v = valuesItr.next();
+    				valuesArrayList.add(v);
+    			}
+    			
+    			int[] valuesArray = valuesArrayList.stream().mapToInt(v -> v.intValue()).toArray();
+    			
+    			ret[i][j] = modelCopy.intVar(attr[i][j].getName(), valuesArray);
+    		}
+    	}
+    	return ret;
     }
-
+    
     private List<IntVar> findDifferences(IntVar[][] oldAttr, IntVar[][] newAttr) {
 
         List<IntVar> ret = new ArrayList<>();
@@ -379,5 +375,37 @@ public class Zebra extends AbstractProblem {
         }
 
         return valuesArray;
+    }
+    
+    private void test() {
+    	try {
+            model.getSolver().propagate();
+            
+            HashMap<Integer, ArrayList<IntVar>> casesEgales = new HashMap<Integer, ArrayList<IntVar>>();
+
+            for(int i =  0; i < SIZE ; i++) {
+        		casesEgales.put(i, new ArrayList<IntVar>());
+            }
+            
+            for(int i =  0; i < SIZE ; i++) {
+            	for(int j =  0 ; j < SIZE ; j++) {
+            		if (attr[i][j].isInstantiated()) {
+            			casesEgales.get(attr[i][j].getValue()).add(attr[i][j]);
+            		}
+            	}
+            }      
+            
+            for(int i =  0; i < SIZE ; i++) {
+            	ArrayList<IntVar> varEgales = (ArrayList<IntVar>) casesEgales.get(i);
+            	for(int j =  0; j < varEgales.size() ; j++) {
+            		varEgales.get(j).eq(i).post();
+            	}
+            }
+            model.getSolver().propagate();
+            print(attr);
+            
+        } catch (ContradictionException e) {
+            e.printStackTrace();
+        }
     }
 }
