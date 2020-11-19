@@ -221,8 +221,7 @@ public class Zebra extends AbstractProblem {
     				nIndexPushed = nIndex;
     				
     				// Create a not_n constraints
-					int[] valuesArray = getValues(notN(n));
-					vConstraint = ((IntVar) modelVars[i]).in(valuesArray).decompose();
+					vConstraint = ((IntVar) modelVars[i]).in(notN(n)).decompose();
     				
     				constraintsToUnpost.add(vConstraint);
     				IntVar[][] attrStateSnapshot = deepCopy(attr2);
@@ -341,8 +340,7 @@ public class Zebra extends AbstractProblem {
         return ret;
     }
 
-    private IntVar notN(IntVar n) {
-        String name = "NOT_" + n.getName();
+    private int[] notN(IntVar n) {
         List<Integer> values = new ArrayList<>();
         for (int i = 1; i < SIZE; i++) {
             if (!n.contains(i)) {
@@ -350,8 +348,7 @@ public class Zebra extends AbstractProblem {
             }
         }
         int[] valuesArray = values.stream().mapToInt(v -> v.intValue()).toArray();
-        IntVar notN = model.intVar(name, valuesArray);
-        return notN;
+        return valuesArray;
     }
 
     private int[] getValues(IntVar n) {
