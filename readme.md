@@ -1,6 +1,8 @@
 Projet Capitrain
 ===
 
+Requirements : Java JDK 11
+
 An attempt at implementing the algorithms described in the article [A framework for step-wise explaining how to solve constraint satisfaction problems](http://www.bartbogaerts.eu/articles/future/005-Expl/Zebra-Journal.pdf).
 
 The project includes two problem definitions, one for the original Zebra puzzle in the java/Zebra.java file, and one for the pasta puzzle discussed in the article in the file java/Pasta.java.
