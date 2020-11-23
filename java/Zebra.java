@@ -15,6 +15,7 @@ import org.chocosolver.solver.constraints.Constraint;
 import org.chocosolver.solver.exception.ContradictionException;
 import org.chocosolver.solver.variables.IntVar;
 import org.chocosolver.solver.variables.Variable;
+import org.chocosolver.util.ESat;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -158,10 +159,20 @@ public class Zebra extends AbstractProblem {
 
     @Override
     public void solve() {
-    	candidateExplanations();
-//    	test();
+    	Explainer.candidateExplanations(model, attr, model2, attr2, SIZE, SIZE);
+    	print(attr2);
+    	/*try {
+    		Explainer.propagateToSolution(model, attr, SIZE, SIZE);
+    		print(attr);
+		} catch (ContradictionException e) {
+			e.printStackTrace();
+		}*/
     }
 
+    /**
+     * Prints the matrix of intvar passed as param 
+     * @param pos
+     */
     private void print(IntVar[][] pos) {
         System.out.printf("%-13s%-13s%-13s%-13s%-13s%-13s%n", "",
                 sHouse[0], sHouse[1], sHouse[2], sHouse[3], sHouse[4]);
@@ -180,229 +191,5 @@ public class Zebra extends AbstractProblem {
 
     public static void main(String[] args) {
         new Zebra().execute(args);
-    }
-
-    /**
-     * Algorithm 2: Candidate Explanations
-     */
-    private void candidateExplanations() {
-        try {
-
-            List<List<IntVar>> candidatesVariable = new ArrayList<>();
-            List<ContradictionException> candidatesContradictions = new ArrayList<>();
-    		
-    		// Look for facts that need to be explained
-    		model.getSolver().propagate();
-    		// Corresponds to J \ I in algorithm 2
-    		List<IntVar> listDifferences = findDifferences(attr2, attr);
-
-    		Variable[] modelVars = model2.getVars();
-
-    		List<Constraint> constraintsToUnpost = new ArrayList<>();
-    		
-    		int nIndex = 0;
-    		int nIndexPushed = 0;
-    		
-    		while (nIndex < listDifferences.size()) {
-    			
-    			IntVar n = listDifferences.get(nIndex);
-    			
-    			System.out.println(n);
-    			
-    			// Find the variable corresponding to the new fact
-    			int i = getVarATraiter(modelVars, n);
-    			
-    			if (model2.getSolver().getEnvironment().getWorldIndex() == 0) {
-
-    				Constraint vConstraint;
-    				
-    				// Save current state
-    				model2.getSolver().getEnvironment().worldPush();
-    				nIndexPushed = nIndex;
-    				
-    				// Create a not_n constraints
-					vConstraint = ((IntVar) modelVars[i]).in(notN(n)).decompose();
-    				
-    				constraintsToUnpost.add(vConstraint);
-    				IntVar[][] attrStateSnapshot = deepCopy(attr2);
-    				
-    				model2.post(vConstraint);
-    				 try {
-	                    model2.getSolver().propagate();
-	                } catch (ContradictionException e) {
-	                    e.printStackTrace();
-	                    candidatesContradictions.add(e);
-	                    
-	                    // Keep all implied facts
-	                    candidatesVariable.add(findDifferences(attrStateSnapshot, attr2));
-	                    
-	                    model2.getSolver().getEnvironment().worldPop();
-	                    nIndex = nIndexPushed-1;
-	                    model2.unpost(vConstraint);
-	                    model2.post(vConstraint.getOpposite());
-	                }
-    			}
-    			else {
-    			
-    				Constraint vConstraint;
-    				
-    				// Create a n constraints
-					int[] valuesArray = getValues(n);
-					vConstraint = ((IntVar) modelVars[i]).in(valuesArray).decompose();
-    				
-    				constraintsToUnpost.add(vConstraint);
-    				model2.post(vConstraint);
-    				try {
-    					model2.getSolver().propagate();
-    				}
-    				catch (ContradictionException e) {
-    					e.printStackTrace();
-    					model2.getSolver().getEnvironment().worldPop();
-    					nIndex = nIndexPushed-1;
-    					model2.unpost(vConstraint);
-    					model2.post(vConstraint.getOpposite());
-    				}
-    			}
-    			nIndex++;
-    		}
-    		
-    		print(attr2);
-    		
-    	 } catch (ContradictionException e) {
-             e.printStackTrace();
-         }
-    }
-
-	private int getVarATraiter(Variable[] modelVars, IntVar n) {
-		Variable variableATraiter = null;
-		int i = -1;
-		while (variableATraiter == null) {
-			i++;
-			if (n.getName().equals(modelVars[i].getName())) {
-				variableATraiter = modelVars[i];
-			}
-		}
-		return i;
-	}
-    
-    private IntVar[][] deepCopy(IntVar[][] attr) {
-    	
-    	IntVar[][] ret = new IntVar[SIZE][SIZE];
-    	Model modelCopy = new Model();
-    	
-    	for (int i = 0 ; i < SIZE ; i ++) {
-    		for (int j = 0 ; j < SIZE ; j++) {
-    			
-    			Iterator<Integer> valuesItr = attr[i][j].iterator();
-    			ArrayList<Integer> valuesArrayList = new ArrayList<>();
-    			
-    			while (valuesItr.hasNext()) {
-    				Integer v = valuesItr.next();
-    				valuesArrayList.add(v);
-    			}
-    			
-    			int[] valuesArray = valuesArrayList.stream().mapToInt(v -> v.intValue()).toArray();
-    			
-    			ret[i][j] = modelCopy.intVar(attr[i][j].getName(), valuesArray);
-    		}
-    	}
-    	return ret;
-    }
-    
-    private List<IntVar> findDifferences(IntVar[][] oldAttr, IntVar[][] newAttr) {
-
-        List<IntVar> ret = new ArrayList<>();
-
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-
-                Iterator<Integer> oldValuesItr = oldAttr[i][j].iterator();
-                ArrayList<Integer> oldValuesArrayList = new ArrayList<>();
-
-                while (oldValuesItr.hasNext()) {
-                    Integer v = oldValuesItr.next();
-                    oldValuesArrayList.add(v);
-                }
-
-                Iterator<Integer> newValuesItr = newAttr[i][j].iterator();
-                ArrayList<Integer> newValuesArrayList = new ArrayList<>();
-
-                while (newValuesItr.hasNext()) {
-                    Integer v = newValuesItr.next();
-                    newValuesArrayList.add(v);
-                }
-
-                if (!oldValuesArrayList.equals(newValuesArrayList)) {
-                    ret.add(newAttr[i][j]);
-                }
-            }
-        }
-        return ret;
-    }
-
-    private int[] notN(IntVar n) {
-        List<Integer> values = new ArrayList<>();
-        for (int i = 1; i < SIZE; i++) {
-            if (!n.contains(i)) {
-                values.add(i);
-            }
-        }
-        int[] valuesArray = values.stream().mapToInt(v -> v.intValue()).toArray();
-        return valuesArray;
-    }
-
-    private int[] getValues(IntVar n) {
-
-        int[] valuesArray = null;
-
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-
-                Iterator<Integer> valuesItr = n.iterator();
-                ArrayList<Integer> valuesArrayList = new ArrayList<>();
-
-                while (valuesItr.hasNext()) {
-                    Integer v = valuesItr.next();
-                    valuesArrayList.add(v);
-                }
-
-                valuesArray = valuesArrayList.stream().mapToInt(v -> v.intValue()).toArray();
-
-            }
-        }
-
-        return valuesArray;
-    }
-    
-    private void test() {
-    	try {
-            model.getSolver().propagate();
-            
-            HashMap<Integer, ArrayList<IntVar>> casesEgales = new HashMap<Integer, ArrayList<IntVar>>();
-
-            for(int i =  0; i < SIZE ; i++) {
-        		casesEgales.put(i, new ArrayList<IntVar>());
-            }
-            
-            for(int i =  0; i < SIZE ; i++) {
-            	for(int j =  0 ; j < SIZE ; j++) {
-            		if (attr[i][j].isInstantiated()) {
-            			casesEgales.get(attr[i][j].getValue()).add(attr[i][j]);
-            		}
-            	}
-            }      
-            
-            for(int i =  0; i < SIZE ; i++) {
-            	ArrayList<IntVar> varEgales = (ArrayList<IntVar>) casesEgales.get(i);
-            	for(int j =  0; j < varEgales.size() ; j++) {
-            		varEgales.get(j).eq(i).post();
-            	}
-            }
-            model.getSolver().propagate();
-            print(attr);
-            
-        } catch (ContradictionException e) {
-            e.printStackTrace();
-        }
     }
 }
