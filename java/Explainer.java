@@ -37,7 +37,6 @@ public class Explainer {
     		List<Constraint> constraintsToUnpost = new ArrayList<>();
     		
     		int nIndex = 0;
-    		int nIndexPushed = 0;
     		
     		while (nIndex < listDifferences.size()) {
     			
@@ -54,7 +53,6 @@ public class Explainer {
     				
     				// Save current state
     				model2.getSolver().getEnvironment().worldPush();
-    				nIndexPushed = nIndex;
     				
     				// Create a not_n constraints
 					vConstraint = ((IntVar) modelVars[i]).in(notN(n, sizeX)).decompose();
@@ -73,7 +71,6 @@ public class Explainer {
 	                    // Keep all implied facts
 	                    candidatesVariable.add(findDifferences(attrStateSnapshot, attr2, sizeX, sizeY));
 	                    model2.getSolver().getEnvironment().worldPop();
-	                    nIndex = nIndexPushed;
 	                    model2.unpost((Constraint[]) constraintsToUnpost.toArray(new Constraint[constraintsToUnpost.size()]));
 	                    model2.post(vConstraint.getOpposite());
 	                }
@@ -94,12 +91,10 @@ public class Explainer {
 	                    candidatesContradictions.add(e);
 	                    
 	                    model2.getSolver().getEnvironment().worldPop();
-	                    nIndex = nIndexPushed;
 	                    model2.unpost((Constraint[]) constraintsToUnpost.toArray(new Constraint[constraintsToUnpost.size()]));
 	                    model2.post(vConstraint.getOpposite());
 	                }
     			}
-    			nIndex++;
     		}
     }
 
